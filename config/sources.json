@@ -1,0 +1,70 @@
+{
+  "_comment": "Source catalogue + theme dictionaries. To add a source: one new object in the 'sources' array. method='rss' (urls + optional telegram fallback) or method='telegram'. Verified 2026-06-23 (see docs/sources.md). State paths (inbox_dir, seen_path, log_path) are relative to DATA_DIR.",
+
+  "settings": {
+    "lookback_days": 4,
+    "max_items_per_source": 25,
+    "request_timeout": 12,
+    "inbox_dir": "inbox",
+    "archive_dir": "archive",
+    "digests_dir": "digests",
+    "seen_path": "seen_urls.json",
+    "log_path": "monitor.log",
+    "theme_filter_sources": ["meduza", "mediazona", "theinsider", "novaya_europe", "moscowtimes", "currenttime", "astra", "sirena", "tvrain", "echofm", "zerkalo"],
+    "_theme_filter_note": "For these high-volume daily-news / breaking desks only theme-matching / priority items are kept (noise filter). Purely investigative outlets keep everything; final curation is done by the digest model."
+  },
+
+  "themes": {
+    "covert_ops": ["диверс","саботаж","подрыв","северный поток","поджог","покушени","отравлен","ликвидац","вербов","агентурн","нелегал","шпион","контрразвед","экстрадиц","теневой флот","обход санкц","росатом","кибератак","хакер","взлом","чвк","вагнер","диверсант","sabotage","nord stream","espionage","shadow fleet","assassination","saboteur"],
+    "influence": ["влияни", "пропаганд", "дезинформ", "вмешат", "фейк", "фабрик троллей", "малофеев", "дугин", "influence", "disinformation", "propaganda", "interference", "doppelganger", "troll farm", "active measures"],
+    "corruption": ["корруп", "взятк", "откат", "офшор", "отмыван", "хищени", "госконтракт", "госзакуп", "распил", "недвижимост", "corruption", "bribe", "embezzle", "offshore", "money laundering", "kickback", "procurement", "kleptocra", "shell company"],
+    "intelligence": ["фсб", "гру", "свр", "спецслужб", "разведк", "контрразведк", "шпион", "вербовк", "лубянк", "fsb", "gru", "svr", "intelligence", "spy", "espionage", "security service", "recruit", "operative"],
+    "military": ["украин", "войн", "фронт", "всу", "минобороны", "вагнер", "чвк", "наемник", "мобилизац", "дрон", "бпла", "ракет", "обстрел", "оккупац", "военн", "ukraine", "war", "military", "wagner", "mercenary", "missile", "drone", "front", "offensive", "shelling", "occupation"],
+    "economy": ["экономик", "бюджет", "ввп", "инфляц", "рубл", "нефт", "газ", "спг", "экспорт", "импорт", "торгов", "economy", "gdp", "inflation", "ruble", "oil", "gas", "lng", "budget", "export", "import", "trade", "deficit"],
+    "sanctions": ["санкц", "теневой флот", "подсанкцион", "параллельн импорт", "sanction", "shadow fleet", "evasion", "embargo", "export control", "circumvent", "parallel import", "frozen asset"],
+    "repression": ["репресс", "иноагент", "нежелательн", "экстремист", "приговор", "арест", "пытк", "политзаключ", "цензур", "роскомнадзор", "repression", "foreign agent", "undesirable", "extremist", "sentenced", "prison", "torture", "political prisoner", "censorship", "crackdown"]
+  },
+
+  "priority_keywords": [],
+
+  "sources": [
+    {"id": "meduza", "name": "Meduza", "lang": "en", "method": "rss", "urls": ["https://meduza.io/rss/en/all"], "telegram": "meduzalive", "enabled": true, "tier": "core"},
+    {"id": "meduza_ru", "name": "Meduza (RU)", "lang": "ru", "method": "rss", "urls": ["https://meduza.io/rss/all"], "enabled": false, "tier": "core", "note": "Full RU feed - disabled by default (overlaps with the EN feed)."},
+    {"id": "istories", "name": "iStories (Vazhnyye istorii)", "lang": "ru", "method": "telegram", "telegram": "istories_media", "enabled": true, "tier": "core", "note": "RSS unreliable (/rss 403, /rss/all.xml empty) -> Telegram."},
+    {"id": "proekt", "name": "Proekt", "lang": "ru", "method": "rss", "urls": ["https://www.proekt.media/feed"], "telegram": "proektproekt", "enabled": true, "tier": "core"},
+    {"id": "theinsider", "name": "The Insider", "lang": "ru", "method": "rss", "urls": ["https://theins.ru/feed"], "enabled": true, "tier": "core"},
+    {"id": "mediazona", "name": "Mediazona", "lang": "mixed", "method": "rss", "urls": ["https://zona.media/rss"], "telegram": "mediazzzona", "enabled": true, "tier": "core"},
+    {"id": "novaya_europe", "name": "Novaya Gazeta Europe", "lang": "ru", "method": "rss", "urls": ["https://novayagazeta.eu/feed/rss"], "telegram": "novaya_europe", "enabled": true, "tier": "core"},
+    {"id": "agentstvo", "name": "Agentstvo", "lang": "ru", "method": "telegram", "telegram": "agentstvonews", "enabled": true, "tier": "core"},
+    {"id": "verstka", "name": "Verstka (Vyorstka)", "lang": "ru", "method": "rss", "urls": ["https://verstka.media/feed"], "enabled": true, "tier": "core"},
+    {"id": "holod", "name": "Holod", "lang": "ru", "method": "rss", "urls": ["https://holod.media/feed/"], "telegram": "holodmedia", "enabled": true, "tier": "core"},
+    {"id": "dossier", "name": "Dossier Center", "lang": "ru", "method": "telegram", "telegram": "dossiercenter", "enabled": true, "tier": "core"},
+    {"id": "bellingcat", "name": "Bellingcat", "lang": "en", "method": "rss", "urls": ["https://www.bellingcat.com/feed/"], "enabled": true, "tier": "core"},
+    {"id": "occrp", "name": "OCCRP", "lang": "en", "method": "rss", "urls": ["https://www.occrp.org/en/feed"], "enabled": true, "tier": "core"},
+
+    {"id": "moscowtimes", "name": "The Moscow Times", "lang": "en", "method": "rss", "urls": ["https://www.themoscowtimes.com/rss/news"], "enabled": true, "tier": "desk"},
+    {"id": "thebell", "name": "The Bell", "lang": "ru", "method": "rss", "urls": ["https://thebell.io/feed"], "enabled": true, "tier": "desk"},
+    {"id": "vottak", "name": "Vot Tak (Belsat)", "lang": "ru", "method": "rss", "urls": ["https://vot-tak.tv/rss"], "telegram": "vottaktv", "enabled": true, "tier": "desk", "note": "Polish public-service (Belsat/TVP) funding - Kremlin-independent, but not an independent Russian outlet."},
+    {"id": "sotavision", "name": "SOTAvision", "lang": "ru", "method": "rss", "urls": ["https://sotavision.world/feed"], "enabled": true, "tier": "desk", "note": "Sota.Vision (foreign agent), activist/livestream profile - a tip source, not document-based investigations."},
+    {"id": "astra", "name": "ASTRA", "lang": "ru", "method": "rss", "urls": ["https://astra.press/feed"], "telegram": "astrapress", "enabled": true, "tier": "desk", "note": "Fast breaking/source network - lead generator, verify before citing."},
+    {"id": "mozhem", "name": "Mozhem Obyasnit", "lang": "ru", "method": "telegram", "telegram": "mozhemobyasnit", "enabled": true, "tier": "desk"},
+    {"id": "systema", "name": "Systema (RFE/RL)", "lang": "ru", "method": "telegram", "telegram": "systemasystema", "enabled": true, "tier": "desk"},
+    {"id": "cherta", "name": "Cherta", "lang": "ru", "method": "rss", "urls": ["https://cherta.media/feed"], "enabled": true, "tier": "desk"},
+    {"id": "republic", "name": "Republic", "lang": "ru", "method": "telegram", "telegram": "republicmag", "enabled": true, "tier": "desk", "note": "republic.ru is archive only; live content has no working RSS -> Telegram."},
+    {"id": "vlast", "name": "Vlast (ex-Faridaily)", "lang": "ru", "method": "rss", "urls": ["https://vlast.is/feed"], "enabled": true, "tier": "desk", "note": "Faridaily moved to the Vlast name/domain in 2026."},
+    {"id": "tvrain", "name": "TV Rain (Dozhd)", "lang": "ru", "method": "telegram", "telegram": "tvrain", "enabled": true, "tier": "desk", "note": "Exile Russian-language TV, Amsterdam. No public RSS -> Telegram."},
+    {"id": "spektr", "name": "Spektr", "lang": "ru", "method": "rss", "urls": ["https://spektr.press/feed/"], "enabled": true, "tier": "desk", "note": "Exile (Latvia) Russian-language news/analysis."},
+    {"id": "echofm", "name": "Echo FM", "lang": "ru", "method": "rss", "urls": ["https://echofm.online/feed"], "telegram": "echofm_online", "enabled": true, "tier": "desk", "note": "Successor of the banned Echo of Moscow, Berlin."},
+    {"id": "zerkalo", "name": "Zerkalo", "lang": "ru", "method": "telegram", "telegram": "zerkalo_io", "enabled": true, "tier": "desk", "note": "Exile (Lithuania) Russian-language, strong Belarus focus."},
+
+    {"id": "kedr", "name": "Kedr.media", "lang": "ru", "method": "rss", "urls": ["https://kedr.media/feed"], "telegram": "kedr_media", "enabled": true, "tier": "thematic"},
+    {"id": "baikal", "name": "People of Baikal", "lang": "ru", "method": "rss", "urls": ["https://baikal-journal.ru/feed"], "enabled": true, "tier": "thematic"},
+    {"id": "tinvariant", "name": "T-invariant", "lang": "ru", "method": "rss", "urls": ["https://t-invariant.org/feed"], "enabled": true, "tier": "thematic"},
+    {"id": "cit", "name": "Conflict Intelligence Team (CIT)", "lang": "ru", "method": "telegram", "telegram": "CITeam", "enabled": true, "tier": "thematic"},
+    {"id": "currenttime", "name": "Current Time (RFE/RL)", "lang": "ru", "method": "telegram", "telegram": "currenttime", "enabled": true, "tier": "thematic"},
+    {"id": "7x7", "name": "7x7 Horizontal Russia", "lang": "ru", "method": "rss", "urls": ["https://semnasem.org/rss/default.xml"], "telegram": "horizontal_russia", "enabled": true, "tier": "thematic"},
+    {"id": "sirena", "name": "Sirena", "lang": "ru", "method": "telegram", "telegram": "news_sirena", "enabled": true, "tier": "thematic", "note": "Fast regional/breaking - theme-filtered (theme_filter)."},
+    {"id": "nemoskva", "name": "Govorit NeMoskva", "lang": "ru", "method": "rss", "urls": ["https://nemoskva.net/feed"], "telegram": "Govorit_NeMoskva", "enabled": true, "tier": "thematic"},
+    {"id": "bumaga", "name": "Bumaga (Paper)", "lang": "ru", "method": "rss", "urls": ["https://paperpaper.io/feed"], "telegram": "paperpaper_ru", "enabled": true, "tier": "thematic", "note": "paperpaper.io sits behind Cloudflare (may return 403) -> Telegram fallback."}
+  ]
+}

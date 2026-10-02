@@ -1,0 +1,22 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+*.env
+
+# runtime data
+data/
+inbox/
+archive/
+digests/
+seen_urls.json
+monitor.log
+
+# python
+.venv*/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# local tooling and notes
+local/

@@ -1,0 +1,20 @@
+[Unit]
+Description=OSINT digest (LangGraph pipeline, LLM via OpenAI-compatible API, Resend e-mail)
+Wants=network-online.target
+After=network-online.target
+# Optional failure alert: point this at a notify unit you own.
+# OnFailure=<your-notify-unit>@%n.service
+
+[Service]
+Type=oneshot
+# Placeholders: replace <SERVICE_USER> and the /opt paths with your own.
+User=<SERVICE_USER>
+# KEY=VALUE file, same variable names as .env.example. Keep it readable only by the service user.
+EnvironmentFile=/etc/osint-digest/osint-digest.env
+Environment=PYTHONIOENCODING=utf-8
+Environment=DATA_DIR=/var/lib/osint-digest
+WorkingDirectory=/opt/osint-digest
+ExecStart=/opt/osint-digest/.venv/bin/python -m digest.graph --send-email
+TimeoutStartSec=1500
+NoNewPrivileges=yes
+PrivateTmp=yes
