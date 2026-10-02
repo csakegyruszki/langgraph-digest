@@ -259,7 +259,8 @@ def build_graph():
         # Network-bound nodes retry on transient errors (measured 2026-10-02: a connect timeout to the
         # LLM endpoint killed a whole run when llm() had no retry).
         retry = (RetryPolicy(max_attempts=4, initial_interval=5.0, retry_on=_transient)
-                 if name in ("rank", "fetch", "write", "email") else None)
+                 if name in ("rank", "fetch", "write") else None)
+        # Never "email": a timeout after Resend accepted the message would send a duplicate.
         g.add_node(name, fn, retry_policy=retry)
     g.add_edge(START, "collect")
     for a, b in [("collect", "load"), ("load", "rank"), ("rank", "fetch"), ("fetch", "write"), ("write", "repair")]:

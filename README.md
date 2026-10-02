@@ -28,13 +28,13 @@ flowchart TD
 | `rank` | LLM call #1, JSON list of candidate item numbers for the "In focus" section | 4 attempts, transient errors only |
 | `fetch` | trafilatura full-text extraction for the top 3 fetchable candidates (Telegram links skipped) | 4 attempts |
 | `write` | LLM call #2, the digest; section spec comes verbatim from `prompts/digest_spec.md` | 4 attempts |
-| `repair` | every URL in the draft that was not in the input is swapped for the closest collected URL (difflib, cutoff 0.9) or unwrapped to plain text | no |
+| `repair` | every Markdown link URL in the draft that was not in the input is swapped for the closest collected URL (difflib, cutoff 0.9) or unwrapped to plain text | no |
 | `save` | writes `<DATA_DIR>/digests/<day>_RU-OSINT-digest.md` and a `.meta.json` sidecar (counts, token usage, repaired/removed links) | no |
-| `email` | Resend, only with `--send-email` | 4 attempts |
+| `email` | Resend, only with `--send-email` | no retry (a retry after an accepted send would duplicate the e-mail) |
 
 ## Why LangGraph
 
-- **Retry policy per node.** A single connect timeout to the LLM endpoint killed a whole run before the pipeline was a graph. Network-bound nodes now carry a `RetryPolicy(max_attempts=4, initial_interval=5.0)` (LLM read timeout 300 s) that retries only transient errors (URLError, timeouts, HTTP 408/429/5xx); everything else fails fast. Measured end-to-end on 2026-10-02 on a slow connection: the rank call timed out three times and succeeded on the fourth attempt; the run completed in 943 s (normal: 41–123 s).
+- **Retry policy per node.** A single connect timeout to the LLM endpoint killed a whole run before the pipeline was a graph. The LLM and fetch nodes now carry a `RetryPolicy(max_attempts=4, initial_interval=5.0)` (LLM read timeout 300 s) that retries only transient errors (URLError, timeouts, HTTP 408/429/5xx); everything else fails fast. The e-mail node is not retried (a timeout after an accepted send would duplicate the e-mail). Provider error bodies go to the local log only; exceptions carry the status code. Measured end-to-end on 2026-10-02 on a slow connection: the rank call timed out three times and succeeded on the fourth attempt; the run completed in 943 s (normal: 41–123 s).
 - **Bounded rewrite loop.** The model sometimes invents or corrupts URLs. `repair` fixes what it can deterministically; if links still cannot be resolved, one (and only one, `MAX_REWRITES = 1`) rewrite pass goes back to `write` with the offending URLs listed. The bound lives in a pure routing function that is unit-tested.
 - **Explicit state.** Everything that crosses a step (`picks`, `focus`, `draft`, `unresolved`, `rewrite_count`, `write_calls`) is a typed `State` key. The same state feeds the `.meta.json` sidecar and the Langfuse root-span metadata, so a run can be audited without rereading prompts.
 - **Opt-in side effects.** E-mail is a separate node behind a conditional edge that is taken only with `--send-email`.

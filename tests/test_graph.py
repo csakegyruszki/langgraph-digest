@@ -33,9 +33,10 @@ def test_email_requires_explicit_flag():
 
 def test_retry_policy_only_on_network_nodes():
     nodes = G.build_graph().nodes
-    for name in ("rank", "fetch", "write", "email"):
+    for name in ("rank", "fetch", "write"):
         assert nodes[name].retry_policy, name
-    for name in ("collect", "load", "repair", "save"):
+    # email is deliberately NOT retried: a timeout after the provider accepted the send would duplicate it
+    for name in ("collect", "load", "repair", "save", "email"):
         assert not nodes[name].retry_policy, name
 
 

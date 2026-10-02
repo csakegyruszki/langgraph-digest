@@ -12,7 +12,7 @@ digest pipeline (digest/graph.py). Stdlib only, runs on Windows and Linux.
 
 Usage (from the repository root):
     python -m collector.monitor                 # live run, writes to the inbox
-    python -m collector.monitor --dry-run       # writes nothing, prints a summary
+    python -m collector.monitor --dry-run       # no inbox items or seen-URL state; still creates the data dir and log
     python -m collector.monitor --since 7       # look back 7 days
     python -m collector.monitor --source proekt # a single source only
     python -m collector.monitor --verbose

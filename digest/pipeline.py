@@ -76,7 +76,10 @@ def llm(system: str, user: str, temperature: float = 0.3) -> tuple[str, dict]:
             out = json.loads(r.read())
     except urllib.error.HTTPError as e:  # the key is not in the error body
         # A real exception (not SystemExit), so the graph's RetryPolicy can see 408/429/5xx.
-        raise LLMHTTPError(e.code, e.read().decode(errors="replace")[:300]) from None
+        # The provider's error body is printed to the local log only; the exception (which a tracing
+        # backend may record) carries the status code alone.
+        print(f"llm: HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr, flush=True)
+        raise LLMHTTPError(e.code, "see local log") from None
     usage = out.get("usage", {}) or {}
     usage["_model"] = out.get("model", body["model"])
     return out["choices"][0]["message"]["content"].strip(), usage
@@ -193,4 +196,5 @@ def send_mail(subject: str, md_text: str) -> str:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read()).get("id", "?")
     except urllib.error.HTTPError as e:
-        raise SystemExit(f"Resend HTTP {e.code}: {e.read().decode(errors='replace')[:300]}")
+        print(f"resend: HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr, flush=True)
+        raise SystemExit(f"Resend HTTP {e.code} (details in local log)")
