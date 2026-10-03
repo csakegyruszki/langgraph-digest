@@ -148,7 +148,7 @@ def n_load(s: State) -> State:
         files = [f]
         items = [json.loads(l) for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
     else:
-        files, items = D.load_inbox()
+        files, items = D.load_inbox(s["cfg"])
     listing = "\n".join(D.item_line(i, it) for i, it in enumerate(items))
     return {"framing": framing, "step4": step4, "items": items, "files": [str(x) for x in files],
             "listing": listing, "rewrite_count": 0, "write_calls": 0, "unresolved": [], "draft": ""}
@@ -223,7 +223,7 @@ def route_after_repair(s: State) -> str:
 
 @observe(name="save", capture_input=False, capture_output=False)
 def n_save(s: State) -> State:
-    out_dir = D.data_dir() / "digests"
+    out_dir = D.state_dir(s["cfg"], "digests_dir")
     out_dir.mkdir(parents=True, exist_ok=True)
     name = D.slug(s["cfg"])
     p, n = out_dir / f"{s['day']}_{name}.md", 2

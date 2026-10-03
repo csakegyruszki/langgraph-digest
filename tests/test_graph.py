@@ -161,3 +161,15 @@ def test_retry_policy_reruns_node_on_timeout():
     g.add_edge(START, "w")
     g.add_edge("w", END)
     assert g.compile().invoke({}) == {"n": 3}
+
+
+def test_state_dirs_honour_settings_and_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    assert P.state_dir({}, "inbox_dir") == tmp_path.resolve() / "inbox"
+    cfg = {"settings": {"inbox_dir": "in2", "digests_dir": "out2"}}
+    assert P.state_dir(cfg, "inbox_dir") == tmp_path.resolve() / "in2"
+    assert P.state_dir(cfg, "digests_dir") == tmp_path.resolve() / "out2"
+    (tmp_path / "in2").mkdir()
+    (tmp_path / "in2" / "run-1.jsonl").write_text('{"title": "a"}\n', encoding="utf-8")
+    files, items = P.load_inbox(cfg)
+    assert len(files) == 1 and items == [{"title": "a"}]

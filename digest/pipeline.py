@@ -146,8 +146,14 @@ def collect(cfg: dict) -> None:
         raise SystemExit(f"collector exit {r.returncode}: {r.stderr.strip()[-600:]}")
 
 
-def load_inbox() -> tuple[list[Path], list[dict]]:
-    files = sorted((data_dir() / "inbox").glob("run-*.jsonl"))
+def state_dir(cfg: dict | None, key: str) -> Path:
+    """settings.<key> (inbox_dir / digests_dir) relative to DATA_DIR; defaults to the key without '_dir'."""
+    default = key.removesuffix("_dir")
+    return data_dir() / ((cfg or {}).get("settings") or {}).get(key, default)
+
+
+def load_inbox(cfg: dict | None = None) -> tuple[list[Path], list[dict]]:
+    files = sorted(state_dir(cfg, "inbox_dir").glob("run-*.jsonl"))
     items = []
     for f in files:
         for line in f.read_text(encoding="utf-8").splitlines():

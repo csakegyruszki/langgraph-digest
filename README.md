@@ -11,7 +11,7 @@ Two ready-made configs ship under [`examples/`](examples):
 | [`examples/tech-news`](examples/tech-news) | **Default.** 4 well-known public tech feeds, 3 sections, a few priority keywords. The smallest complete config. |
 | [`examples/ru-media-watch`](examples/ru-media-watch) | 35 enabled public RSS/Telegram sources, 4 sections, theme dictionaries, an empty keyword list. The larger, real-world config the cost numbers below were measured on. Source notes in [`sources.md`](examples/ru-media-watch/sources.md). |
 
-The default is the tech example: it works with no edits and is the safest thing to run first. To make your own digest, copy an example folder and edit `digest.json`.
+The default is the tech example: it needs no config edits and is the safest thing to run first. A real run (not `--dry-run` or the offline tests) still needs credentials for an OpenAI-compatible LLM endpoint: `OPENROUTER_API_KEY`, or the variable named by `LLM_API_KEY_VAR` (see Variables below). To make your own digest, copy an example folder and edit `digest.json`.
 
 ## Architecture
 
@@ -35,7 +35,7 @@ flowchart TD
 | `collect` | runs `python -m collector.monitor --config <config> --since <lookback_days>`: fetch RSS/Telegram, theme-tag, dedup by URL, write `inbox/run-*.jsonl` | no |
 | `load` | reads the inbox (or `--inbox-file`) and builds the prompt from `prompts/digest_template.md` + the config | no |
 | `rank` | LLM call #1, JSON list of candidate item numbers for the in-focus section (skipped when `focus_count` is 0) | 4 attempts, transient errors only |
-| `fetch` | trafilatura full-text extraction for the top `focus_count` fetchable candidates (Telegram links skipped) | 4 attempts |
+| `fetch` | trafilatura full-text extraction for the top `focus_count` fetchable candidates (Telegram links skipped) | 4 attempts, transient errors of the node as a whole; a single article that fails to download or extract is caught, logged, and the next candidate is tried |
 | `write` | LLM call #2, the digest; the section spec is the config's `sections` rendered into the template | 4 attempts |
 | `repair` | every Markdown link URL in the draft that was not in the input is swapped for the closest collected URL (difflib, cutoff 0.9) or unwrapped to plain text | no |
 | `save` | writes `<DATA_DIR>/digests/<day>_<slug>.md` and a `.meta.json` sidecar (counts, token usage, repaired/removed links, config path) | no |
@@ -120,7 +120,8 @@ Python 3.13 was used; 3.11+ should work.
 ```bash
 python -m venv .venv
 . .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt     # requirements-dev.txt adds pytest
+pip install -r requirements.txt
+pip install -r requirements-dev.txt   # pytest, needed for the tests
 cp .env.example .env            # fill in the names you need; never commit it
 ```
 
