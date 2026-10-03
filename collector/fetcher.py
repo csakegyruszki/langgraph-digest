@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-collector/fetcher.py - source adapters for the OSINT collector.
+collector/fetcher.py - source adapters for the digest collector.
 
 Source adapters, all using only the Python stdlib (no pip dependency):
   - parse_rss / fetch_rss   : RSS 2.0 + Atom feeds
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
-log = logging.getLogger("ru-osint-monitor.fetcher")
+log = logging.getLogger("digest-collector.fetcher")
 
 # Browser-like headers: reduce trivial 403/bot blocks.
 # (Does not help against a Cloudflare JS challenge -> the Telegram fallback catches those.)
@@ -32,7 +32,7 @@ DEFAULT_HEADERS = {
                    "AppleWebKit/537.36 (KHTML, like Gecko) "
                    "Chrome/124.0.0.0 Safari/537.36"),
     "Accept": "text/html,application/xhtml+xml,application/xml,text/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate",
     "Connection": "close",
 }
@@ -202,7 +202,7 @@ def parse_rss_bytes(data, source):
         items.append({
             "source_id": source["id"],
             "source": source["name"],
-            "lang": source.get("lang", "ru"),
+            "lang": source.get("lang", "en"),
             "method": "rss",
             "title": title,
             "url": link.strip(),
@@ -287,7 +287,7 @@ def fetch_telegram(source):
         items.append({
             "source_id": source["id"],
             "source": source["name"],
-            "lang": source.get("lang", "ru"),
+            "lang": source.get("lang", "en"),
             "method": "telegram",
             "title": title,
             "url": permalink,

@@ -1,10 +1,13 @@
-"""Pipeline building blocks for the OSINT digest: collect, rank, fetch, write, repair links, e-mail.
+"""Pipeline building blocks for the digest: collect, rank, fetch, write, repair links, e-mail.
 
 These are plain functions with no orchestration of their own; `digest/graph.py` wires them into a
 LangGraph StateGraph. Nothing here prints or logs secret values.
 
+Everything topic-specific (title, language, audience, sections, sources, keywords) comes from one JSON
+config (see load_config); this module has no topic wording of its own.
+
 Environment (see .env.example): LLM_API_KEY_VAR (name of the variable holding the LLM key),
-LLM_BASE_URL, DEEPSEEK_MODEL, RESEND_API_KEY, DIGEST_TO, RESEND_FROM, DATA_DIR.
+LLM_BASE_URL, DEEPSEEK_MODEL, RESEND_API_KEY, DIGEST_TO, RESEND_FROM, DATA_DIR, DIGEST_CONFIG.
 """
 from __future__ import annotations
 
@@ -22,10 +25,11 @@ import markdown
 import trafilatura
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = ROOT / "prompts" / "digest_spec.md"
+TEMPLATE = ROOT / "prompts" / "digest_template.md"
+DEFAULT_CONFIG = ROOT / "examples" / "tech-news" / "digest.json"
 URL_RE = re.compile(r"https?://[^\s)\]>\"']+")
 SUMMARY_CHARS = 350       # per inbox item in the prompt
-FULLTEXT_CHARS = 12000    # per In-focus article
+FULLTEXT_CHARS = 12000    # per in-focus article
 LOOKBACK_DAYS = 4
 
 
@@ -41,12 +45,59 @@ def need(name: str) -> str:
     return v
 
 
-def spec_parts() -> tuple[str, str]:
-    """(framing + beat, section spec) from prompts/digest_spec.md."""
-    p = SPEC.read_text(encoding="utf-8")
-    framing = p[p.index("## Framing"): p.index("## Sections")].replace("## Framing", "", 1).strip()
-    sections = p[p.index("## Sections"):].strip()
-    return framing, sections
+def load_config(path: str | os.PathLike | None = None) -> dict:
+    """Load the digest config: `path`, else $DIGEST_CONFIG, else the tech-news example.
+
+    Required: digest.title, digest.slug, digest.sections (non-empty list of {name, instruction}).
+    Optional digest keys: language (English), audience, beat, focus_count (3), priority_keywords.
+    Returns the whole config dict with defaults filled into cfg["digest"], plus cfg["_path"].
+    """
+    p = Path(path or os.environ.get("DIGEST_CONFIG") or DEFAULT_CONFIG)
+    cfg = json.loads(p.read_text(encoding="utf-8"))
+    d = cfg.get("digest")
+    if not isinstance(d, dict):
+        raise SystemExit(f"{p}: missing 'digest' block")
+    for k in ("title", "slug", "sections"):
+        if not d.get(k):
+            raise SystemExit(f"{p}: digest.{k} is required")
+    for sec in d["sections"]:
+        if not sec.get("name") or not sec.get("instruction"):
+            raise SystemExit(f"{p}: every section needs 'name' and 'instruction'")
+    d.setdefault("language", "English")
+    d.setdefault("audience", "a general reader who wants a concise overview")
+    d.setdefault("beat", "whatever is most significant in the collected items")
+    d.setdefault("focus_count", 3)
+    d.setdefault("priority_keywords", [])
+    if d["focus_count"] and not any(sec.get("focus") for sec in d["sections"]):
+        raise SystemExit(f"{p}: focus_count > 0 needs one section with \"focus\": true")
+    cfg["_path"] = str(p)
+    return cfg
+
+
+def slug(cfg: dict) -> str:
+    """Filesystem-safe slug for output filenames."""
+    return re.sub(r"[^a-z0-9]+", "-", cfg["digest"]["slug"].lower()).strip("-") or "digest"
+
+
+def lookback_days(cfg: dict) -> int:
+    return int((cfg.get("settings") or {}).get("lookback_days", LOOKBACK_DAYS))
+
+
+def focus_section_name(cfg: dict) -> str:
+    return next((s["name"] for s in cfg["digest"]["sections"] if s.get("focus")), "")
+
+
+def spec_parts(cfg: dict) -> tuple[str, str]:
+    """(framing + beat, section spec): prompts/digest_template.md filled from cfg["digest"]."""
+    d = cfg["digest"]
+    t = TEMPLATE.read_text(encoding="utf-8")
+    sections = "\n".join(f"{i}. **{s['name']}**: {s['instruction']}" for i, s in enumerate(d["sections"], 2))
+    for key, val in (("title", d["title"]), ("audience", d["audience"]), ("language", d["language"]),
+                     ("beat", d["beat"]), ("focus_count", str(d["focus_count"])), ("sections", sections)):
+        t = t.replace("{{" + key + "}}", val)
+    m1 = re.search(r"^## Framing\s*$", t, re.M)
+    m2 = re.search(r"^## Sections\s*$", t, re.M)
+    return t[m1.end():m2.start()].strip(), t[m2.start():].strip()
 
 
 # Per-socket-read timeout. 600 s x retries meant ~30 min before giving up on a stalled connection
@@ -85,9 +136,10 @@ def llm(system: str, user: str, temperature: float = 0.3) -> tuple[str, dict]:
     return out["choices"][0]["message"]["content"].strip(), usage
 
 
-def collect() -> None:
+def collect(cfg: dict) -> None:
     """Run the collector as a module from the repository root; it inherits DATA_DIR from the environment."""
-    r = subprocess.run([sys.executable, "-m", "collector.monitor", "--since", str(LOOKBACK_DAYS)],
+    r = subprocess.run([sys.executable, "-m", "collector.monitor", "--config", cfg["_path"],
+                        "--since", str(lookback_days(cfg))],
                        cwd=ROOT, capture_output=True, text=True, timeout=600)
     print(r.stdout.strip()[-400:])
     if r.returncode != 0:
@@ -106,8 +158,7 @@ def load_inbox() -> tuple[list[Path], list[dict]]:
 
 def item_line(i: int, it: dict) -> str:
     s = re.sub(r"\s+", " ", it.get("summary") or "").strip()[:SUMMARY_CHARS]
-    flags = ",".join(x for x in (["COVERT_OPS"] if it.get("covert_ops") else [])
-                     + (["PRIORITY"] if it.get("priority") else []))
+    flags = "PRIORITY" if it.get("priority") else ""
     link = it.get("url", "")
     if it.get("source_url") and it["source_url"] != link:
         link += f" | original: {it['source_url']}"
@@ -118,8 +169,8 @@ def item_line(i: int, it: dict) -> str:
 
 def pick_focus(framing: str, listing: str, n: int) -> list[int]:
     system = (framing + "\n\nTASK: from the numbered items, choose the most significant beat-relevant stories "
-              "for the 'In focus — read in full' section (favor COVERT_OPS and intelligence/influence/"
-              "sanctions-evasion). Return ONLY JSON: {\"picks\": [<item numbers, best first>]} with "
+              "for the in-focus section, which is read in full (favor items flagged PRIORITY and those that "
+              "match the beat best). Return ONLY JSON: {\"picks\": [<item numbers, best first>]} with "
               f"{n} numbers; each pick must be a different story.")
     txt, _ = llm(system, listing, temperature=0.1)
     m = re.search(r"\{.*\}", txt, re.S)
@@ -185,13 +236,13 @@ def email_html(md_text: str) -> str:
 
 
 def send_mail(subject: str, md_text: str) -> str:
-    body = {"from": os.environ.get("RESEND_FROM") or "OSINT Digest <onboarding@resend.dev>",
+    body = {"from": os.environ.get("RESEND_FROM") or "Digest <onboarding@resend.dev>",
             "to": [need("DIGEST_TO")], "subject": subject,
             "html": email_html(md_text), "text": md_text}
     req = urllib.request.Request(
         "https://api.resend.com/emails", data=json.dumps(body).encode(),
         headers={"Authorization": "Bearer " + need("RESEND_API_KEY"), "Content-Type": "application/json",
-                 "User-Agent": "osint-digest-langgraph/1.0"})
+                 "User-Agent": "langgraph-digest/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read()).get("id", "?")

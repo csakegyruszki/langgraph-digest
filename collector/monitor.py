@@ -32,7 +32,7 @@ from pathlib import Path
 from . import fetcher
 
 ROOT = Path(__file__).resolve().parent.parent
-log = logging.getLogger("osint-collector")
+log = logging.getLogger("digest-collector")
 
 
 def data_dir():
@@ -73,13 +73,11 @@ def tag_item(item, themes, priority_kw):
         if any(kw in text for kw in kws):
             matched.append(theme)
     hot = any(kw in text for kw in priority_kw)
-    covert = "covert_ops" in matched
-    score = len(matched) + (3 if hot else 0) + (3 if covert else 0)
+    score = len(matched) + (3 if hot else 0)
     item["themes"] = matched
     item["priority_hit"] = hot
-    item["covert_ops"] = covert
     item["relevance_score"] = score
-    item["priority"] = bool(hot or covert or len(matched) >= 2)
+    item["priority"] = bool(hot or len(matched) >= 2)
     return item
 
 
@@ -99,7 +97,7 @@ def run(args):
         return 2
     settings = cfg.get("settings", {})
     themes = cfg.get("themes", {})
-    priority_kw = [k.lower() for k in cfg.get("priority_keywords", [])]
+    priority_kw = [k.lower() for k in (cfg.get("digest") or {}).get("priority_keywords", [])]
 
     base = data_dir()
     inbox = base / settings.get("inbox_dir", "inbox")
@@ -109,6 +107,8 @@ def run(args):
     setup_logging(str(log_path), args.verbose)
 
     fetcher.TIMEOUT = settings.get("request_timeout", 20)
+    if settings.get("accept_language"):
+        fetcher.DEFAULT_HEADERS["Accept-Language"] = settings["accept_language"]
     lookback = args.since if args.since is not None else settings.get("lookback_days", 4)
     cutoff = datetime.now(timezone.utc) - timedelta(days=lookback)
     max_per = settings.get("max_items_per_source", 25)
@@ -174,7 +174,7 @@ def run(args):
 
     prio = sum(1 for x in new_items if x.get("priority"))
     print("\n" + "=" * 64)
-    print("  OSINT collector - " + now_iso)
+    print("  Digest collector - " + now_iso)
     print("  New items: %d  (of which priority: %d)" % (len(new_items), prio))
     print("  Skipped: %d already seen, %d old (>%d days)" % (skipped_seen, skipped_old, lookback))
     print("=" * 64)
@@ -207,8 +207,8 @@ def run(args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="OSINT investigative monitor - collector")
-    ap.add_argument("--config", default=str(ROOT / "config" / "sources.json"))
+    ap = argparse.ArgumentParser(description="Digest collector: fetch sources, tag, dedup, write the inbox")
+    ap.add_argument("--config", default=os.environ.get("DIGEST_CONFIG") or str(ROOT / "examples" / "tech-news" / "digest.json"))
     ap.add_argument("--dry-run", action="store_true", help="write no files, only summarize")
     ap.add_argument("--since", type=int, default=None, help="lookback in days")
     ap.add_argument("--source", default=None, help="only this single source (id)")

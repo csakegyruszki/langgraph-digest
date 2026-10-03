@@ -1,1 +1,1 @@
-"""Public-news OSINT digest pipeline (LangGraph + optional Langfuse tracing)."""
+"""Topic-agnostic news/feed digest pipeline (LangGraph + optional Langfuse tracing)."""

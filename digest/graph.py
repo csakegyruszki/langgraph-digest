@@ -1,10 +1,10 @@
-"""OSINT digest as a LangGraph StateGraph.
+"""Topic-agnostic digest as a LangGraph StateGraph.
 
 Graph: collect(skippable) -> load -> rank(LLM#1) -> fetch -> write(LLM#2) -> repair
        -> [unresolved links AND rewrite_count < 1 ? write : save] -> save -> (email only with --send-email)
 
 All pipeline logic lives in digest/pipeline.py; this module only wires it into a graph.
-Output: $DATA_DIR/digests/<day>_RU-OSINT-digest.md (+ .meta.json). Inbox files are never moved.
+Output: $DATA_DIR/digests/<day>_<slug>.md (+ .meta.json); the slug comes from the config. Inbox files are never moved.
 
 Langfuse (optional): active only if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set. Uses the
 SDK v3+/v4 `@observe` decorator (nodes = spans, LLM calls = generations with usage_details).
@@ -14,7 +14,7 @@ Config comes from the process environment; `--env-file PATH` optionally loads KE
 environment first (existing variables win, values are never printed). Note: --env-file is read at import
 time (from sys.argv) so that LANGFUSE_* keys are seen before the tracing decorators are applied.
 
-Usage: python -m digest.graph --skip-collect --inbox-file path/to/run-XXXX.jsonl
+Usage: python -m digest.graph --config examples/tech-news/digest.json --skip-collect --inbox-file path/to/run-XXXX.jsonl
 """
 from __future__ import annotations
 
@@ -107,6 +107,7 @@ D.llm = traced_llm  # pick_focus() resolves llm via the pipeline module global -
 # ---------- state ----------
 class State(TypedDict, total=False):
     day: str
+    cfg: dict             # loaded digest config (digest.load_config)
     skip_collect: bool
     inbox_file: str | None
     send_email: bool
@@ -135,13 +136,13 @@ def n_collect(s: State) -> State:
     if s.get("skip_collect"):
         print("collect: skipped")
     else:
-        D.collect()
+        D.collect(s["cfg"])
     return {}
 
 
 @observe(name="load", capture_input=False, capture_output=False)
 def n_load(s: State) -> State:
-    framing, step4 = D.spec_parts()
+    framing, step4 = D.spec_parts(s["cfg"])
     if s.get("inbox_file"):
         f = Path(s["inbox_file"])
         files = [f]
@@ -155,36 +156,40 @@ def n_load(s: State) -> State:
 
 @observe(name="rank", capture_input=False, capture_output=False)
 def n_rank(s: State) -> State:
-    return {"picks": D.pick_focus(s["framing"], s["listing"], 6)}
+    n = s["cfg"]["digest"]["focus_count"]
+    if n <= 0:
+        return {"picks": []}
+    return {"picks": D.pick_focus(s["framing"], s["listing"], n * 2)}
 
 
 @observe(name="fetch", capture_input=False, capture_output=False)
 def n_fetch(s: State) -> State:
     items, focus = s["items"], []
     for idx in s["picks"]:
-        if 0 <= idx < len(items) and len(focus) < 3:
+        if 0 <= idx < len(items) and len(focus) < s["cfg"]["digest"]["focus_count"]:
             got = D.fetch_full(items[idx])
             if got:
                 focus.append((idx, got[0], got[1]))
             else:
-                print(f"In-focus candidate [{idx}] not fetchable, trying next")
+                print(f"in-focus candidate [{idx}] not fetchable, trying next")
     return {"focus": focus}
 
 
 @observe(name="write", capture_input=False, capture_output=False)
 def n_write(s: State) -> State:
-    items, focus, day = s["items"], s["focus"], s["day"]
+    items, focus, day, cfg = s["items"], s["focus"], s["day"], s["cfg"]
+    focus_name = D.focus_section_name(cfg)
     sources = sorted({it.get("source", "?") for it in items})
     focus_block = "\n\n".join(
         f"### IN-FOCUS [{i}] — full text fetched from {u}\n{t}" for i, u, t in focus) or "(none fetchable)"
     system = (s["framing"] + "\n\n" + s["step4"] + "\n\n"
-              "OUTPUT RULES (server edition): return ONLY the digest in Markdown. The 'In focus' pieces are "
-              "the full texts given below; if fewer than three are given, present only those, without "
-              "explaining why. Never mention how the digest was produced (collector, tagging, model, "
-              "pipeline, fetching). Links: Markdown [Outlet name](URL) with a human-readable "
+              "OUTPUT RULES (server edition): return ONLY the digest in Markdown. The in-focus pieces "
+              f"(section '{focus_name}') are the full texts given below; if fewer than "
+              f"{cfg['digest']['focus_count']} are given, present only those, without explaining why. "
+              "Never mention how the digest was produced (collector, tagging, model, pipeline, fetching). Links: Markdown [Outlet name](URL) with a human-readable "
               "outlet name as the visible text, never a bare URL or domain. Copy URLs exactly from the "
               "input — never build or invent one. Do not invent facts, names, numbers or dates.")
-    user = (f"Generated: {day}. Window: last {D.LOOKBACK_DAYS} days. Items: {len(items)} from "
+    user = (f"Generated: {day}. Window: last {D.lookback_days(cfg)} days. Items: {len(items)} from "
             f"{len(sources)} sources ({', '.join(sources)}).\n\n## IN-FOCUS FULL TEXTS\n{focus_block}\n\n"
             f"## ALL COLLECTED ITEMS\n{s['listing']}")
     known = sorted({u.rstrip(".,;") for u in D.URL_RE.findall(user)})
@@ -220,13 +225,14 @@ def route_after_repair(s: State) -> str:
 def n_save(s: State) -> State:
     out_dir = D.data_dir() / "digests"
     out_dir.mkdir(parents=True, exist_ok=True)
-    p, n = out_dir / f"{s['day']}_RU-OSINT-digest.md", 2
+    name = D.slug(s["cfg"])
+    p, n = out_dir / f"{s['day']}_{name}.md", 2
     while p.exists():
-        p, n = out_dir / f"{s['day']}_RU-OSINT-digest-v{n}.md", n + 1
+        p, n = out_dir / f"{s['day']}_{name}-v{n}.md", n + 1
     p.write_text(s["draft"].rstrip() + "\n", encoding="utf-8")
     meta = {"items": len(s["items"]), "focus_fetched": len(s["focus"]), "picks": s["picks"],
             "links_repaired": s["fixed"], "links_removed": s["dropped"], "links_unverified_final": s["unresolved"],
-            "rewrite_count": s["rewrite_count"], "write_calls": s["write_calls"],
+            "rewrite_count": s["rewrite_count"], "write_calls": s["write_calls"], "config": s["cfg"]["_path"],
             "llm_calls": USAGE_LOG, "inbox_files": s["files"], "langfuse": LANGFUSE_ON}
     p.with_suffix(".meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"digest: {p} | items={len(s['items'])} focus={len(s['focus'])} rewrites={s['rewrite_count']}")
@@ -235,7 +241,7 @@ def n_save(s: State) -> State:
 
 @observe(name="email", capture_input=False, capture_output=False)
 def n_email(s: State) -> State:
-    mid = D.send_mail(f"OSINT Digest — {s['day']}", Path(s["out_file"]).read_text(encoding="utf-8"))
+    mid = D.send_mail(f"{s['cfg']['digest']['title']} — {s['day']}", Path(s["out_file"]).read_text(encoding="utf-8"))
     print(f"email sent: resend id={mid}")
     return {}
 
@@ -271,7 +277,7 @@ def build_graph():
     return g.compile()
 
 
-@observe(name="osint-digest-run", capture_input=False, capture_output=False)
+@observe(name="digest-run", capture_input=False, capture_output=False)
 def run_graph(graph, init: dict) -> dict:
     """One Langfuse trace per run: every node/LLM span nests under this root span."""
     final = graph.invoke(init)
@@ -292,6 +298,7 @@ def _today() -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--config", help="digest config JSON (default: $DIGEST_CONFIG, else examples/tech-news/digest.json)")
     ap.add_argument("--skip-collect", action="store_true", help="reuse existing inbox files")
     ap.add_argument("--no-email", action="store_true", help="accepted for parity; email is off by default")
     ap.add_argument("--send-email", action="store_true", help="explicit opt-in to send via Resend")
@@ -303,9 +310,11 @@ def main(argv=None) -> int:
     load_env_file(a.env_file)
     load_llm_defaults()
     print("langfuse: enabled" if LANGFUSE_ON else "langfuse: disabled (no keys)")
+    cfg = D.load_config(a.config)
+    print(f"config: {cfg['_path']}")
     graph = build_graph()
     t0 = time.time()
-    final = run_graph(graph, {"day": _today(), "skip_collect": a.skip_collect, "inbox_file": a.inbox_file,
+    final = run_graph(graph, {"day": _today(), "cfg": cfg, "skip_collect": a.skip_collect, "inbox_file": a.inbox_file,
                               "send_email": send})
     tok = [(u["prompt_tokens"], u["completion_tokens"]) for u in USAGE_LOG]
     print(f"done in {time.time() - t0:.0f}s | llm_calls={len(USAGE_LOG)} tokens(prompt,completion)={tok} "

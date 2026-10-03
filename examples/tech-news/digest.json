@@ -1,0 +1,54 @@
+{
+  "_comment": "EXAMPLE and default config: a small general-tech digest. 'digest' = what to write; 'settings' = collector behaviour; 'themes' = keyword dictionaries used to tag items (lowercase substrings); 'sources' = feeds. State paths are relative to DATA_DIR.",
+  "digest": {
+    "title": "Tech News Digest",
+    "slug": "tech-news",
+    "language": "English",
+    "audience": "a software engineer who wants a fast, accurate overview of the week in technology",
+    "beat": "software and internet platforms, AI and machine learning, security incidents and vulnerabilities, open-source projects, and notable hardware or infrastructure developments. Skip product-deal and gadget-review items unless they change how people build or secure software.",
+    "focus_count": 3,
+    "priority_keywords": ["zero-day", "vulnerability", "outage", "open source"],
+    "sections": [
+      {
+        "name": "In focus",
+        "focus": true,
+        "instruction": "the deep reads: for each, tags, a clean source link, and a summary of 4-5 short sentences (what happened, the key number or method, why it matters)."
+      },
+      {
+        "name": "Also worth reading",
+        "instruction": "5-8 further notable items, each a 2-3 sentence summary (what happened plus one analytical \"so what\"), tags, and a clean source link. Merge duplicate coverage of one event into a single entry citing the best 2-3 sources."
+      },
+      {
+        "name": "Security watch",
+        "instruction": "every item tagged `security` that is not already covered above: one or two sentences each plus link. Small items count; do not skip them for being short."
+      }
+    ]
+  },
+  "settings": {
+    "lookback_days": 4,
+    "max_items_per_source": 25,
+    "request_timeout": 12,
+    "inbox_dir": "inbox",
+    "archive_dir": "archive",
+    "digests_dir": "digests",
+    "seen_path": "seen_urls.json",
+    "log_path": "monitor.log",
+    "theme_filter_sources": []
+  },
+  "themes": {
+    "ai": [" ai ", "ai-", " llm", "machine learning", "neural", "openai", "anthropic", "gemini"],
+    "security": ["vulnerab", "zero-day", "exploit", "breach", "ransomware", "malware", "cve-", "phishing"],
+    "open_source": ["open source", "open-source", "linux", "kernel", "github", "license"],
+    "hardware": ["chip", "gpu", "cpu", "semiconductor", "datacenter", "data center"]
+  },
+  "sources": [
+    {"id": "hackernews", "name": "Hacker News", "lang": "en", "method": "rss",
+     "urls": ["https://news.ycombinator.com/rss"], "enabled": true, "tier": "core"},
+    {"id": "arstechnica", "name": "Ars Technica", "lang": "en", "method": "rss",
+     "urls": ["https://feeds.arstechnica.com/arstechnica/index"], "enabled": true, "tier": "core"},
+    {"id": "theverge", "name": "The Verge", "lang": "en", "method": "rss",
+     "urls": ["https://www.theverge.com/rss/index.xml"], "enabled": true, "tier": "core"},
+    {"id": "lwn", "name": "LWN.net", "lang": "en", "method": "rss",
+     "urls": ["https://lwn.net/headlines/rss"], "enabled": true, "tier": "thematic"}
+  ]
+}

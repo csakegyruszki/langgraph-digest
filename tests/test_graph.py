@@ -47,11 +47,55 @@ def test_transient_classifier():
     assert not G._transient(ValueError("x"))
 
 
+TECH = P.ROOT / "examples" / "tech-news" / "digest.json"
+RU = P.ROOT / "examples" / "ru-media-watch" / "digest.json"
+
+
 def test_spec_parts_split():
-    framing, sections = P.spec_parts()
+    framing, sections = P.spec_parts(P.load_config(TECH))
     assert framing and not framing.startswith("##")
     assert sections.startswith("## Sections")
-    assert "In focus" in sections
+    assert "{{" not in framing + sections  # every placeholder was filled
+
+
+def test_prompt_contains_every_configured_section_header():
+    cfg = P.load_config(TECH)
+    framing, sections = P.spec_parts(cfg)
+    prompt = framing + "\n" + sections
+    names = [s["name"] for s in cfg["digest"]["sections"]]
+    assert len(names) == 3
+    for i, name in enumerate(names, 2):
+        assert f"{i}. **{name}**" in prompt, name
+    assert cfg["digest"]["title"] in prompt and cfg["digest"]["audience"] in prompt
+
+
+def test_both_examples_load_and_default_is_tech():
+    assert P.DEFAULT_CONFIG == TECH
+    tech, ru = P.load_config(TECH), P.load_config(RU)
+    assert P.slug(tech) == "tech-news" and P.slug(ru) == "ru-media-watch"
+    assert len(ru["sources"]) == 36 and sum(1 for x in ru["sources"] if x.get("enabled", True)) == 35
+    assert ru["digest"]["priority_keywords"] == []
+    assert P.focus_section_name(tech) == "In focus"
+
+
+def test_load_config_rejects_missing_focus_section(tmp_path):
+    import json
+    import pytest
+    cfg = json.loads(TECH.read_text(encoding="utf-8"))
+    for s in cfg["digest"]["sections"]:
+        s.pop("focus", None)
+    f = tmp_path / "bad.json"
+    f.write_text(json.dumps(cfg), encoding="utf-8")
+    with pytest.raises(SystemExit):
+        P.load_config(f)
+
+
+def test_tag_item_uses_config_keywords():
+    from collector.monitor import tag_item
+    cfg = P.load_config(TECH)
+    it = tag_item({"title": "New zero-day in a Linux kernel driver", "summary": ""}, cfg["themes"],
+                  cfg["digest"]["priority_keywords"])
+    assert it["priority"] and "security" in it["themes"] and "open_source" in it["themes"]
 
 
 def test_env_file_does_not_override_and_skips_empty(tmp_path, monkeypatch):

@@ -1,6 +1,6 @@
 # Source inventory
 
-**35 active sources** (config: `config/sources.json`). Tested live and checked against public information on **2026-06-23**. All outlets are real, editorially independent (Vot Tak excepted, see below) and active. Most carry a "foreign agent" or "undesirable" designation and are blocked inside Russia; for this category that is expected, not a warning sign. Only public RSS feeds and public Telegram web previews are used; no logins, no tokens.
+**35 active sources** (config: `digest.json` in this folder). Tested live and checked against public information on **2026-06-23**. All outlets are real, editorially independent (Vot Tak excepted, see below) and active. Most carry a "foreign agent" or "undesirable" designation and are blocked inside Russia; for this category that is expected, not a warning sign. Only public RSS feeds and public Telegram web previews are used; no logins, no tokens.
 
 ## Collection method per source
 
