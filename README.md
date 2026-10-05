@@ -1,4 +1,5 @@
 # langgraph-digest
+[![tests](https://github.com/csakegyruszki/langgraph-digest/actions/workflows/tests.yml/badge.svg)](https://github.com/csakegyruszki/langgraph-digest/actions/workflows/tests.yml)
 
 A config-driven news digest pipeline, built as an explicit LangGraph state machine with optional Langfuse tracing.
 
